@@ -8,9 +8,9 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 
 export const userRouter = createTRPCRouter({
     createUser: publicProcedure.input(z.object({
-        fullName: z.string(),
-        email: z.string().email(),
-        password: z.string().min(6),
+        fullName: z.string().min(1, "Enter your full name"),
+        email: z.string().email("Please enter a valid email"),
+        password: z.string().min(6, "Password must be at least 6 characters long"),
     })).mutation(async ({ctx, input}) => {
         return ctx.db.tRPCUser.create({
             data: {
