@@ -19,5 +19,13 @@ export const userRouter = createTRPCRouter({
                 password: input.password,
             }
         })
-    })
+    }),
+    getUser: publicProcedure.input(z.object({
+        email: z.string().email("Please enter a valid email"),
+        password: z.string().min(6, "Password must be at least 6 characters long"),
+    })).mutation(async ({ctx, input}) => {
+        return ctx.db.tRPCUser.findFirst({
+            where: {email: input.email, password: input.password}
+        })
+    }),
 })
