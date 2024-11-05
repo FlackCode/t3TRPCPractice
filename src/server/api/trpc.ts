@@ -11,6 +11,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { db } from "~/server/db";
+import { type tRPCUser } from "~/types";
 
 /**
  * 1. CONTEXT
@@ -25,9 +26,12 @@ import { db } from "~/server/db";
  * @see https://trpc.io/docs/server/context
  */
 export const createTRPCContext = async (opts: { headers: Headers }) => {
+  // eslint-disable-next-line prefer-const
+  let user = null;
   return {
     db,
     ...opts,
+    user,
   };
 };
 

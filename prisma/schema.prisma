@@ -22,4 +22,12 @@ model TRPCUser {
     email       String @unique
     password    String
     fullName    String
+    sessions    Session[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expires   DateTime
+  user      TRPCUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
