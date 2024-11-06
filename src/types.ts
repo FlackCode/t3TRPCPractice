@@ -1,5 +1,6 @@
 import { type PrismaClient } from "@prisma/client";
-import { NextRequest } from "next/server";
+import { type ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
+import { type NextRequest } from "next/server";
 
 export interface TRPCUser {
   id: string;

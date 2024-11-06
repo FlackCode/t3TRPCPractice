@@ -40,54 +40,69 @@ export const userRouter = createTRPCRouter({
     login: publicProcedure.input(z.object({
         email: z.string().email(),
         password: z.string(),
-    })).mutation(async ({ctx, input}) => {
+      })).mutation(async ({ctx, input}) => {
         const user = await ctx.db.tRPCUser.findUnique({
-            where: {email: input.email}
+          where: {email: input.email}
         })
         if (!user) {
-            throw new TRPCError({
-                code: 'NOT_FOUND',
-                message: 'User not found'
-            })
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'User not found'
+          })
         }
         const isPasswordValid = await compare(input.password, user.password);
         if (!isPasswordValid) {
-            throw new TRPCError({
-                code: 'UNAUTHORIZED',
-                message: 'Invalid Password'
-            })
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'Invalid Password'
+          })
         }
         const session = await ctx.db.session.create({
-            data: {
-                userId: user.id,
-                expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) //1 week
-            }
+          data: {
+            userId: user.id,
+            expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 1 week
+          }
         })
         
         // Set the cookie
-        cookies().set('sessionId', session.id, {
-            httpOnly: true,
-            path: '/',
-            maxAge: 7 * 24 * 60 * 60, // 1 week
+        cookies().set({
+          name: 'sessionId',
+          value: session.id,
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          maxAge: 7 * 24 * 60 * 60, // 1 week
+          path: '/',
         });
-
+    
+        console.log('Login - Cookie set:', session.id);
+    
         return { id: user.id, email: user.email, fullName: user.fullName };
-    }),
-
-    logout: protectedProcedure.mutation(async ({ctx}) => {
-        if (ctx.session) {
-            await ctx.db.session.delete({
-                where: { id: ctx.session.id }
-            });
+      }),
+    
+      logout: protectedProcedure.mutation(async ({ctx}) => {
+        if (!ctx.session) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'No active session found'
+          });
         }
         
-        // Clear the cookie
-        cookies().set('sessionId', '', {
-            httpOnly: true,
-            path: '/',
-            maxAge: 0,
+        await ctx.db.session.delete({
+          where: { id: ctx.session.id }
         });
-
+    
+        cookies().set({
+          name: 'sessionId',
+          value: '',
+          maxAge: 0,
+          path: '/',
+        });
+    
+        console.log('Logout - Cookie deleted');
+    
         return { success: true };
-    }),
+      }),
+    
+    
 });

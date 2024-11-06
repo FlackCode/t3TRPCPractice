@@ -6,14 +6,14 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { inferAsyncReturnType, initTRPC, TRPCError } from "@trpc/server";
-import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
-import { NextRequest } from "next/server";
+import { initTRPC, TRPCError } from "@trpc/server";
+import { cookies } from "next/headers";
+import { type NextRequest } from "next/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { db } from "~/server/db";
-import { Session, TRPCUser, type TRPCContext } from "~/types";
+import { type Session, type TRPCUser, type TRPCContext } from "~/types";
 
 /**
  * 1. CONTEXT
@@ -33,7 +33,10 @@ export const createTRPCContext = async (opts: { req: NextRequest }): Promise<TRP
   let user: TRPCUser | null = null;
   let session: Session | null = null;
 
-  const sessionId = req.cookies.get('sessionId')?.value;
+  const cookieStore = cookies();
+  const sessionId = cookieStore.get('sessionId')?.value;
+
+  console.log('createTRPCContext - SessionId from cookie:', sessionId);
 
   if (sessionId) {
     try {
@@ -42,13 +45,20 @@ export const createTRPCContext = async (opts: { req: NextRequest }): Promise<TRP
         include: { user: true },
       });
 
+      console.log('createTRPCContext - Session from DB:', dbSession);
+
       if (dbSession && dbSession.expires > new Date()) {
         session = dbSession;
         user = dbSession.user;
       } else if (dbSession) {
-        // Session expired, delete it
         await db.session.delete({ where: { id: sessionId } });
-        // Note: We can't set cookies directly here in an API route
+        cookieStore.set({
+          name: 'sessionId',
+          value: '',
+          maxAge: 0,
+          path: '/',
+        });
+        console.log('createTRPCContext - Expired session deleted and cookie cleared');
       }
     } catch (error) {
       console.error("Error fetching session:", error);
@@ -139,14 +149,30 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
 
 export const protectedProcedure = t.procedure.use(async (opts) => {
   const { ctx } = opts;
-  if (!ctx.user || !ctx.session) {
-    throw new TRPCError({ code: "UNAUTHORIZED" });
+  const sessionId = ctx.req.cookies.get('sessionId')?.value;
+
+  console.log('Protected Procedure - SessionId from cookie:', sessionId);
+
+  if (!sessionId) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "No session found" });
   }
+
+  const session = await ctx.db.session.findUnique({
+    where: { id: sessionId },
+    include: { user: true },
+  });
+
+  console.log('Protected Procedure - Session from DB:', session);
+
+  if (!session || session.expires < new Date()) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid or expired session" });
+  }
+
   return opts.next({
     ctx: {
       ...ctx,
-      user: ctx.user,
-      session: ctx.session,
+      user: session.user,
+      session: session,
     },
   });
 });
