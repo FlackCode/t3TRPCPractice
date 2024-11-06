@@ -4,7 +4,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { compare, hash } from 'bcrypt'
 import { TRPCError } from "@trpc/server";
 
@@ -64,6 +64,15 @@ export const userRouter = createTRPCRouter({
         })
         ctx.res.setHeader('Set-Cookie', `sessionId=${session.id}; HttpOnly; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
         return { id: user.id, email: user.email, fullName: user.fullName };
+    }),
+    logout: protectedProcedure.mutation(async ({ctx}) => {
+        if (ctx.session) {
+            await ctx.db.session.delete({
+                where: { id: ctx.session.id }
+            });
+        }
+        ctx.res.setHeader('Set-Cookie', 'sessionId=; HttpOnly; Path=/; Max-Age=0');
+        return { success: true };
     }),
 
 })

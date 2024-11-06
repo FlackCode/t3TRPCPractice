@@ -6,12 +6,13 @@
  * TL;DR - This is where all the tRPC server stuff is created and plugged in. The pieces you will
  * need to use are documented accordingly near the end.
  */
-import { initTRPC } from "@trpc/server";
+import { inferAsyncReturnType, initTRPC, TRPCError } from "@trpc/server";
+import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
 import { db } from "~/server/db";
-import { type tRPCUser } from "~/types";
+import { Session, TRPCUser, type TRPCContext } from "~/types";
 
 /**
  * 1. CONTEXT
@@ -25,13 +26,41 @@ import { type tRPCUser } from "~/types";
  *
  * @see https://trpc.io/docs/server/context
  */
-export const createTRPCContext = async (opts: { headers: Headers }) => {
-  // eslint-disable-next-line prefer-const
-  let user = null;
+export const createTRPCContext = async (
+  opts: CreateNextContextOptions
+): Promise<TRPCContext> => {
+  const { req, res } = opts;
+  const sessionId = req.cookies['sessionId'];
+
+  let user: TRPCUser | null = null;
+  let session: Session | null = null;
+
+  if (sessionId) {
+    try {
+      const dbSession = await db.session.findUnique({
+        where: { id: sessionId },
+        include: { user: true },
+      });
+
+      if (dbSession && dbSession.expires > new Date()) {
+        session = dbSession;
+        user = dbSession.user;
+      } else if (dbSession) {
+        // Session expired, delete it
+        await db.session.delete({ where: { id: sessionId } });
+        res.setHeader('Set-Cookie', 'sessionId=; HttpOnly; Path=/; Max-Age=0');
+      }
+    } catch (error) {
+      console.error("Error fetching session:", error);
+    }
+  }
+
   return {
     db,
-    ...opts,
+    req,
+    res,
     user,
+    session,
   };
 };
 
@@ -42,7 +71,7 @@ export const createTRPCContext = async (opts: { headers: Headers }) => {
  * ZodErrors so that you get typesafety on the frontend if your procedure fails due to validation
  * errors on the backend.
  */
-const t = initTRPC.context<typeof createTRPCContext>().create({
+const t = initTRPC.context<TRPCContext>().create({
   transformer: superjson,
   errorFormatter({ shape, error }) {
     return {
@@ -108,3 +137,17 @@ const timingMiddleware = t.middleware(async ({ next, path }) => {
  * are logged in.
  */
 export const publicProcedure = t.procedure.use(timingMiddleware);
+
+export const protectedProcedure = t.procedure.use(async (opts) => {
+  const { ctx } = opts;
+  if (!ctx.user || !ctx.session) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  return opts.next({
+    ctx: {
+      ...ctx,
+      user: ctx.user,
+      session: ctx.session,
+    },
+  });
+});

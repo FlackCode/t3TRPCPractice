@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useCurrentUser } from "~/hooks/user";
 import { api } from "~/trpc/react";
-import { type tRPCUser } from "~/types";
+import { type TRPCUser } from "~/types";
 
 export default function Home() {
   const [formData, setFormData] = useState({
@@ -13,7 +13,7 @@ export default function Home() {
     type: "error" | "success" | "loading" | null;
     message: string;
   }>({ type: null, message: "" });
-  const [user, setUser] = useState<tRPCUser | null>(null);
+  const [user, setUser] = useState<TRPCUser | null>(null);
   useCurrentUser(setUser)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {

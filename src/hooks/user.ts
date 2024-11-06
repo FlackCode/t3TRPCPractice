@@ -1,19 +1,22 @@
 import { useEffect } from "react";
 import { api } from "~/trpc/react";
-import { type tRPCUser } from "~/types";
+import { type TRPCUser } from "~/types";
 
-export const useCurrentUser = (setUser: (user: tRPCUser | null) => void) => {
-    const { data, error, isLoading } = api.user.currentUser.useQuery();
+export const useCurrentUser = (setUser: (user: TRPCUser | null) => void) => {
+    const { data, error, isLoading } = api.user.currentUser.useQuery(undefined, {
+        retry: false,
+        refetchOnWindowFocus: false,
+    });
 
     useEffect(() => {
         if (isLoading) {
             console.log("Loading current user...");
-            return; // Early return if loading
+            return;
         }
 
         if (error) {
             console.error("Error fetching current user:", error);
-            setUser(null); // Handle error case
+            setUser(null);
             return;
         }
 
@@ -22,7 +25,7 @@ export const useCurrentUser = (setUser: (user: tRPCUser | null) => void) => {
             setUser(data);
         } else {
             console.log("No user data found.");
-            setUser(null); // No user data case
+            setUser(null);
         }
     }, [data, error, isLoading, setUser]);
 };
