@@ -8,6 +8,7 @@
  */
 import { inferAsyncReturnType, initTRPC, TRPCError } from "@trpc/server";
 import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
+import { NextRequest } from "next/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 
@@ -26,14 +27,13 @@ import { Session, TRPCUser, type TRPCContext } from "~/types";
  *
  * @see https://trpc.io/docs/server/context
  */
-export const createTRPCContext = async (
-  opts: CreateNextContextOptions
-): Promise<TRPCContext> => {
-  const { req, res } = opts;
-  const sessionId = req.cookies['sessionId'];
-
+export const createTRPCContext = async (opts: { req: NextRequest }): Promise<TRPCContext> => {
+  const { req } = opts;
+  
   let user: TRPCUser | null = null;
   let session: Session | null = null;
+
+  const sessionId = req.cookies.get('sessionId')?.value;
 
   if (sessionId) {
     try {
@@ -48,7 +48,7 @@ export const createTRPCContext = async (
       } else if (dbSession) {
         // Session expired, delete it
         await db.session.delete({ where: { id: sessionId } });
-        res.setHeader('Set-Cookie', 'sessionId=; HttpOnly; Path=/; Max-Age=0');
+        // Note: We can't set cookies directly here in an API route
       }
     } catch (error) {
       console.error("Error fetching session:", error);
@@ -58,7 +58,6 @@ export const createTRPCContext = async (
   return {
     db,
     req,
-    res,
     user,
     session,
   };

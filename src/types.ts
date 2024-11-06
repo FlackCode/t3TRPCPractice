@@ -1,12 +1,12 @@
 import { type PrismaClient } from "@prisma/client";
-import { type IncomingMessage, type ServerResponse } from "http";
+import { NextRequest } from "next/server";
 
 export interface TRPCUser {
   id: string;
   email: string;
   fullName: string;
 }
-  
+
 export interface Session {
   id: string;
   userId: string;
@@ -16,10 +16,7 @@ export interface Session {
 
 export interface TRPCContext {
   db: PrismaClient;
-  req: IncomingMessage & {
-    cookies: Record<string, string>;
-  };
-  res: ServerResponse;
+  req: NextRequest;
   user: TRPCUser | null;
   session: Session | null;
 }

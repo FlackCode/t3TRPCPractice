@@ -7,6 +7,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { compare, hash } from 'bcrypt'
 import { TRPCError } from "@trpc/server";
+import { cookies } from "next/headers";
 
 export const userRouter = createTRPCRouter({
     createUser: publicProcedure.input(z.object({
@@ -62,17 +63,31 @@ export const userRouter = createTRPCRouter({
                 expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) //1 week
             }
         })
-        ctx.res.setHeader('Set-Cookie', `sessionId=${session.id}; HttpOnly; Path=/; Max-Age=${7 * 24 * 60 * 60}`);
+        
+        // Set the cookie
+        cookies().set('sessionId', session.id, {
+            httpOnly: true,
+            path: '/',
+            maxAge: 7 * 24 * 60 * 60, // 1 week
+        });
+
         return { id: user.id, email: user.email, fullName: user.fullName };
     }),
+
     logout: protectedProcedure.mutation(async ({ctx}) => {
         if (ctx.session) {
             await ctx.db.session.delete({
                 where: { id: ctx.session.id }
             });
         }
-        ctx.res.setHeader('Set-Cookie', 'sessionId=; HttpOnly; Path=/; Max-Age=0');
+        
+        // Clear the cookie
+        cookies().set('sessionId', '', {
+            httpOnly: true,
+            path: '/',
+            maxAge: 0,
+        });
+
         return { success: true };
     }),
-
-})
+});
