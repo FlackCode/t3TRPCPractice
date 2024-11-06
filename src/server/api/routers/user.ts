@@ -67,13 +67,14 @@ export const userRouter = createTRPCRouter({
         // Set the cookie
         cookies().set({
           name: 'sessionId',
-          value: session.id,
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: 'strict',
-          maxAge: 7 * 24 * 60 * 60, // 1 week
+          value: session.id, // whatever your session ID is
+          maxAge: 60 * 60 * 24, // set an appropriate max age
           path: '/',
+          sameSite: 'lax',  // 'lax' is usually a good option for local development
+          secure: false,     // ensure secure is false for localhost
+          domain: 'localhost' // explicitly set for localhost
         });
+        
     
         console.log('Login - Cookie set:', session.id);
     
@@ -95,9 +96,10 @@ export const userRouter = createTRPCRouter({
         cookies().set({
           name: 'sessionId',
           value: '',
-          maxAge: 0,
+          maxAge: 0, // Set maxAge to 0 to delete the cookie
           path: '/',
         });
+        
     
         console.log('Logout - Cookie deleted');
     
@@ -106,3 +108,4 @@ export const userRouter = createTRPCRouter({
     
     
 });
+

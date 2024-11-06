@@ -149,7 +149,12 @@ export const publicProcedure = t.procedure.use(timingMiddleware);
 
 export const protectedProcedure = t.procedure.use(async (opts) => {
   const { ctx } = opts;
-  const sessionId = ctx.req.cookies.get('sessionId')?.value;
+  const sessionId = cookies().get('sessionId')?.value;
+
+if (!sessionId) {
+  throw new TRPCError({ code: "UNAUTHORIZED", message: "No session found" });
+}
+
 
   console.log('Protected Procedure - SessionId from cookie:', sessionId);
 
